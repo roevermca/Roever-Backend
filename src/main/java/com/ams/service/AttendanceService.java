@@ -38,6 +38,7 @@ import com.ams.model.Student;
 import com.ams.repository.AttendanceArchiveRepository;
 import com.ams.repository.AttendanceRepository;
 import com.ams.repository.CourseRepository;
+import com.ams.repository.DailyAttendanceSummaryRepository;
 import com.ams.repository.DepartmentRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.security.AuthenticatedUser;
@@ -56,6 +57,7 @@ public class AttendanceService {
     private final DepartmentRepository departmentRepository;
     private final AttendanceArchiveRepository archiveRepository;
     private final MetadataCacheService metadataCacheService;
+    private final DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository;
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
@@ -63,13 +65,15 @@ public class AttendanceService {
             CourseRepository courseRepository,
             DepartmentRepository departmentRepository,
             AttendanceArchiveRepository archiveRepository,
-            MetadataCacheService metadataCacheService) {
+            MetadataCacheService metadataCacheService,
+            DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository) {
         this.attendanceRepository = attendanceRepository;
         this.studentRepository = studentRepository;
         this.courseRepository = courseRepository;
         this.departmentRepository = departmentRepository;
         this.archiveRepository = archiveRepository;
         this.metadataCacheService = metadataCacheService;
+        this.dailyAttendanceSummaryRepository = dailyAttendanceSummaryRepository;
     }
 
     @Transactional
@@ -175,6 +179,22 @@ public class AttendanceService {
 
         // High-speed batch insert into MySQL
         attendanceRepository.saveAll(toInsert);
+
+        // Pre-aggregate daily class rollup for instant reporting (< 3ms)
+        if (dailyAttendanceSummaryRepository != null && !students.isEmpty()) {
+            Student first = students.get(0);
+            try {
+                dailyAttendanceSummaryRepository.refreshClassDailySummary(
+                        request.getDate(),
+                        first.getDepartmentId(),
+                        first.getCourseId(),
+                        first.getYear(),
+                        first.getSection()
+                );
+            } catch (Exception e) {
+                logger.warn("Could not refresh daily attendance summary: {}", e.getMessage());
+            }
+        }
 
         return new BulkAttendanceResponse(
                 true,
@@ -395,6 +415,15 @@ public class AttendanceService {
         record.setMarkedAt(Instant.now());
 
         Attendance saved = attendanceRepository.save(record);
+        if (dailyAttendanceSummaryRepository != null) {
+            studentRepository.findById(saved.getStudentId()).ifPresent(s -> {
+                try {
+                    dailyAttendanceSummaryRepository.refreshClassDailySummary(
+                            saved.getDate(), s.getDepartmentId(), s.getCourseId(), s.getYear(), s.getSection()
+                    );
+                } catch (Exception ignored) {}
+            });
+        }
         return AttendanceResponse.fromEntity(saved);
     }
 

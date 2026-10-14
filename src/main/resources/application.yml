@@ -9,18 +9,26 @@ spring:
   application:
     name: attendance-management-system
   datasource:
-    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:ams_db}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true}
+    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:ams_db}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=500&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true}
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       pool-name: AmsHikariPool
-      maximum-pool-size: ${DB_POOL_MAX:25}
-      minimum-idle: ${DB_POOL_MIN:5}
+      maximum-pool-size: ${DB_POOL_MAX:50}
+      minimum-idle: ${DB_POOL_MIN:10}
       idle-timeout: 300000
       max-lifetime: 1800000
-      connection-timeout: 20000
+      connection-timeout: 30000
       leak-detection-threshold: 30000
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 50
+        queue-capacity: 1000
+        keep-alive: 60s
+      thread-name-prefix: ams-async-
   jpa:
     hibernate:
       ddl-auto: update
@@ -31,7 +39,7 @@ spring:
         auto_quote_keyword: true
         format_sql: false
         jdbc:
-          batch_size: 50
+          batch_size: 500
           order_inserts: true
           order_updates: true
           batch_versioned_data: true
