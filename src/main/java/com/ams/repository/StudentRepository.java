@@ -42,5 +42,7 @@ public interface StudentRepository extends JpaRepository<Student, String>, JpaSp
 
     long countByDepartmentIdAndActiveTrue(String departmentId);
 
+    long countByDepartmentIdInAndActiveTrue(Collection<String> departmentIds);
+
     long countByActiveTrue();
 }

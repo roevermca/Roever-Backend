@@ -95,6 +95,26 @@ public interface AttendanceRepository extends JpaRepository<Attendance, String>,
     );
 
     @Query(value = "SELECT " +
+            "s.course_id AS courseId, " +
+            "s.year AS year, " +
+            "s.section AS section, " +
+            "COUNT(DISTINCT s.id) AS totalStudents, " +
+            "COALESCE(SUM(CASE WHEN a.status IN ('PRESENT', 'ON_DUTY') THEN 1 ELSE 0 END), 0) AS presentCount, " +
+            "COALESCE(SUM(CASE WHEN a.status = 'ABSENT' THEN 1 ELSE 0 END), 0) AS absentCount, " +
+            "COALESCE(COUNT(a.id), 0) AS totalCount " +
+            "FROM students s " +
+            "LEFT JOIN attendance a ON a.student_id = s.id " +
+            "  AND (:date IS NULL OR a.date = :date) " +
+            "WHERE s.active = true " +
+            "  AND s.department_id IN (:deptIds) " +
+            "GROUP BY s.course_id, s.year, s.section " +
+            "ORDER BY s.course_id, s.year, s.section", nativeQuery = true)
+    List<com.ams.dto.ClassAttendanceSummary> getClassAttendanceSummary(
+            @Param("date") LocalDate date,
+            @Param("deptIds") Collection<String> deptIds
+    );
+
+    @Query(value = "SELECT " +
             "COUNT(DISTINCT s.id) AS totalStudents, " +
             "COALESCE(COUNT(a.id), 0) AS totalRecords, " +
             "COALESCE(SUM(CASE WHEN a.status IN ('PRESENT', 'ON_DUTY') THEN 1 ELSE 0 END), 0) AS presentRecords, " +

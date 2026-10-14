@@ -26,4 +26,10 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     List<User> findByRoleAndActiveTrue(Role role);
 
     long countByRoleInAndActiveTrue(java.util.Collection<Role> roles);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(u) FROM User u WHERE u.departmentId IN :departmentIds AND u.role IN :roles AND u.active = true")
+    long countByDepartmentIdInAndRoleInAndActiveTrue(
+            @org.springframework.data.repository.query.Param("departmentIds") java.util.Collection<String> departmentIds,
+            @org.springframework.data.repository.query.Param("roles") java.util.Collection<Role> roles
+    );
 }
