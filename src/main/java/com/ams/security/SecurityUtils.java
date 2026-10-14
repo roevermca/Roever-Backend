@@ -82,21 +82,42 @@ public final class SecurityUtils {
         }
     }
 
+    public static boolean departmentMatches(String userDept, String targetDept) {
+        if (userDept == null || targetDept == null) {
+            return false;
+        }
+        if (userDept.trim().equalsIgnoreCase(targetDept.trim())) {
+            return true;
+        }
+        String u = userDept.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+        String t = targetDept.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+        if (u.equals(t)) {
+            return true;
+        }
+        if (u.startsWith("dept") && u.substring(4).equals(t)) {
+            return true;
+        }
+        if (t.startsWith("dept") && t.substring(4).equals(u)) {
+            return true;
+        }
+        return false;
+    }
+
     public static void enforceStudentWriteAccess(String studentDepartmentId) {
         AuthenticatedUser user = getCurrentUser();
         if (user == null) {
             return;
         }
         Role role = user.getRole();
-        if (role == Role.ADMIN || role == Role.VP || role == Role.STAFF) {
+        if (role == Role.ADMIN || role == Role.VP) {
             return;
         }
 
-        if (role == Role.HOD) {
-            if (user.getDepartmentId() != null && user.getDepartmentId().equals(studentDepartmentId)) {
+        if (role == Role.HOD || role == Role.STAFF) {
+            if (user.getDepartmentId() != null && departmentMatches(user.getDepartmentId(), studentDepartmentId)) {
                 return;
             }
-            throw new AccessDeniedException("Forbidden: HOD can only manage students in their own department");
+            throw new AccessDeniedException("Forbidden: " + role + " can only manage students in their own department");
         }
         throw new AccessDeniedException("Forbidden: " + role + " is not permitted to manage students");
     }
@@ -110,14 +131,11 @@ public final class SecurityUtils {
         if (role == Role.ADMIN || role == Role.VP) {
             return;
         }
-        if (role == Role.HOD) {
-            if (user.getDepartmentId() != null && user.getDepartmentId().equals(studentDepartmentId)) {
+        if (role == Role.HOD || role == Role.STAFF) {
+            if (user.getDepartmentId() != null && departmentMatches(user.getDepartmentId(), studentDepartmentId)) {
                 return;
             }
-            throw new AccessDeniedException("Forbidden: HOD cannot access students from other departments");
-        }
-        if (role == Role.STAFF) {
-            return;
+            throw new AccessDeniedException("Forbidden: " + role + " cannot access students from other departments");
         }
         if (role == Role.STUDENT) {
             if (user.getStudentId() != null && user.getStudentId().equals(studentId)) {
@@ -159,14 +177,14 @@ public final class SecurityUtils {
             return;
         }
         Role role = user.getRole();
-        if (role == Role.ADMIN || role == Role.VP || role == Role.STAFF) {
+        if (role == Role.ADMIN || role == Role.VP) {
             return;
         }
-        if (role == Role.HOD) {
-            if (user.getDepartmentId() != null && user.getDepartmentId().equals(studentDepartmentId)) {
+        if (role == Role.HOD || role == Role.STAFF) {
+            if (user.getDepartmentId() != null && departmentMatches(user.getDepartmentId(), studentDepartmentId)) {
                 return;
             }
-            throw new AccessDeniedException("Forbidden: HOD can only view attendance for students in their own department");
+            throw new AccessDeniedException("Forbidden: " + role + " can only view attendance for students in their own department");
         }
         if (role == Role.STUDENT) {
             if (user.getStudentId() != null && user.getStudentId().equals(studentId)) {

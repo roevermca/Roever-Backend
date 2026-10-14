@@ -127,6 +127,57 @@ class AttendanceServiceTest {
     }
 
     @Test
+    @DisplayName("STAFF can mark attendance for students across different courses in their own department")
+    void markAttendanceBulk_staffAcrossCoursesInSameDepartment() {
+        setSecurityContext("staff-ca", Role.STAFF, "dept-ca", null);
+
+        Student sBca = new Student("2024BCA01", "BCA Student", "bca@ams.edu", "1234567890",
+                "dept-ca", "course-bca", ProgramType.UG, 1, "A", true);
+        sBca.setId("std-bca-01");
+
+        Student sMca = new Student("2024MCA01", "MCA Student", "mca@ams.edu", "1234567890",
+                "dept-ca", "course-mca", ProgramType.PG, 1, "A", true);
+        sMca.setId("std-mca-01");
+
+        given(studentRepository.findAllById(anyCollection())).willReturn(List.of(sBca, sMca));
+        given(attendanceRepository.findByStudentIdInAndDateAndPeriod(anyCollection(), any(), eq(1)))
+                .willReturn(List.of());
+
+        BulkAttendanceRequest request = new BulkAttendanceRequest(
+                LocalDate.of(2026, 10, 2),
+                1,
+                List.of(
+                        new StudentAttendanceRecord("std-bca-01", AttendanceStatus.PRESENT),
+                        new StudentAttendanceRecord("std-mca-01", AttendanceStatus.PRESENT)
+                )
+        );
+
+        BulkAttendanceResponse response = attendanceService.markAttendanceBulk(request);
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getTotalMarked()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("STAFF cannot mark attendance for students in another department")
+    void markAttendanceBulk_staffOtherDepartmentBlocked() {
+        setSecurityContext("staff-ca", Role.STAFF, "dept-ca", null);
+
+        Student sEe = new Student("2024EE01", "EE Student", "ee@ams.edu", "1234567890",
+                "dept-ee", "course-ee", ProgramType.UG, 1, "A", true);
+        sEe.setId("std-ee-01");
+
+        given(studentRepository.findAllById(anyCollection())).willReturn(List.of(sEe));
+
+        BulkAttendanceRequest request = new BulkAttendanceRequest(
+                LocalDate.of(2026, 10, 2),
+                1,
+                List.of(new StudentAttendanceRecord("std-ee-01", AttendanceStatus.PRESENT))
+        );
+
+        assertThrows(AccessDeniedException.class, () -> attendanceService.markAttendanceBulk(request));
+    }
+
+    @Test
     @DisplayName("Bulk attendance with fullDay=true successfully records all 5 periods")
     void markAttendanceBulk_fullDay_success() {
         setSecurityContext("staff-1", Role.STAFF, "dept-cs", null);

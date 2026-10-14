@@ -95,11 +95,8 @@ public class StudentService {
                 // Rule 6: Never trust departmentId sent by frontend. Restrict HOD to own department.
                 departmentId = currentUser.getDepartmentId();
             } else if (currentUser.getRole() == Role.STAFF) {
-                // STAFF ACCESS CONTROL: If staff is assigned to a course, force restrict to that course!
-                if (currentUser.getCourseId() != null && !currentUser.getCourseId().isBlank()) {
-                    courseId = currentUser.getCourseId();
-                    departmentId = null;
-                } else if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
+                // STAFF ACCESS CONTROL: Full access to staff's assigned department
+                if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
                     departmentId = currentUser.getDepartmentId();
                 }
             } else if (currentUser.getRole() == Role.STUDENT) {
@@ -159,7 +156,8 @@ public class StudentService {
     public List<String> getMatchingCourseIdentifiers(String courseIdentifier) {
         if (courseIdentifier == null || courseIdentifier.isBlank()) return List.of();
         if (metadataCacheService != null) {
-            return metadataCacheService.getMatchingCourseIdentifiers(courseIdentifier);
+            List<String> res = metadataCacheService.getMatchingCourseIdentifiers(courseIdentifier);
+            if (res != null && !res.isEmpty()) return res;
         }
         String trimmed = courseIdentifier.trim();
         List<String> ids = new ArrayList<>();
@@ -183,7 +181,8 @@ public class StudentService {
     public List<String> getMatchingDeptIdentifiers(String deptIdentifier) {
         if (deptIdentifier == null || deptIdentifier.isBlank()) return List.of();
         if (metadataCacheService != null) {
-            return metadataCacheService.getMatchingDeptIdentifiers(deptIdentifier);
+            List<String> res = metadataCacheService.getMatchingDeptIdentifiers(deptIdentifier);
+            if (res != null && !res.isEmpty()) return res;
         }
         String trimmed = deptIdentifier.trim();
         List<String> ids = new ArrayList<>();
@@ -255,17 +254,11 @@ public class StudentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + id));
 
         AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
-        if (currentUser != null && currentUser.getRole() == Role.STAFF) {
-            if (currentUser.getCourseId() != null && !currentUser.getCourseId().isBlank()) {
-                List<String> allowedCourses = getMatchingCourseIdentifiers(currentUser.getCourseId());
-                if (!allowedCourses.contains(student.getCourseId())) {
-                    throw new AccessDeniedException("Forbidden: Staff can only access students in their assigned course (" + currentUser.getCourseId() + ")");
-                }
-            }
+        if (currentUser != null && (currentUser.getRole() == Role.STAFF || currentUser.getRole() == Role.HOD)) {
             if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
                 List<String> allowedDepts = getMatchingDeptIdentifiers(currentUser.getDepartmentId());
                 if (!allowedDepts.contains(student.getDepartmentId())) {
-                    throw new AccessDeniedException("Forbidden: Staff cannot access students from other departments");
+                    throw new AccessDeniedException("Forbidden: " + currentUser.getRole() + " cannot access students from other departments");
                 }
             }
         }
@@ -279,9 +272,12 @@ public class StudentService {
     @Transactional
     public StudentResponse createStudent(StudentRequest request) {
         AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
-        if (currentUser != null && currentUser.getRole() == Role.HOD) {
-            if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().equals(request.getDepartmentId())) {
-                throw new AccessDeniedException("Forbidden: HOD can only manage students in their own department");
+        if (currentUser != null && (currentUser.getRole() == Role.HOD || currentUser.getRole() == Role.STAFF)) {
+            if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
+                List<String> allowedDepts = getMatchingDeptIdentifiers(currentUser.getDepartmentId());
+                if (!allowedDepts.contains(request.getDepartmentId())) {
+                    throw new AccessDeniedException("Forbidden: " + currentUser.getRole() + " can only manage students in their own department");
+                }
             }
         }
 

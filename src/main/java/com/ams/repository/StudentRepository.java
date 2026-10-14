@@ -34,6 +34,8 @@ public interface StudentRepository extends JpaRepository<Student, String>, JpaSp
 
     List<Student> findByDepartmentIdAndActiveTrue(String departmentId);
 
+    List<Student> findByDepartmentIdInAndActiveTrue(Collection<String> departmentIds);
+
     List<Student> findByCourseIdInAndActiveTrue(Collection<String> courseIds);
 
     List<Student> findByRollNoIn(Collection<String> rollNos);

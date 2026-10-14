@@ -97,26 +97,15 @@ public class AttendanceService {
             throw new ResourceNotFoundException("Student not found for IDs: " + missingIds);
         }
 
-        // 2. HOD restriction: all students must belong to HOD's department
-        if (currentUser != null && currentUser.getRole() == Role.HOD) {
-            String hodDept = currentUser.getDepartmentId();
-            for (Student student : students) {
-                if (!student.getDepartmentId().equals(hodDept)) {
-                    throw new AccessDeniedException(
-                            "Forbidden: HOD can only mark attendance for students in their own department (" + hodDept + ")");
-                }
-            }
-        }
-
-        // Staff restriction: all students must belong to Staff's assigned course!
-        if (currentUser != null && currentUser.getRole() == Role.STAFF) {
-            String staffCourse = currentUser.getCourseId();
-            if (staffCourse != null && !staffCourse.isBlank()) {
-                List<String> allowedCourses = getMatchingCourseIdentifiers(staffCourse);
+        // 2. Department restriction for HOD and STAFF: all students must belong to their department
+        if (currentUser != null && (currentUser.getRole() == Role.HOD || currentUser.getRole() == Role.STAFF)) {
+            String userDept = currentUser.getDepartmentId();
+            if (userDept != null && !userDept.isBlank()) {
+                List<String> allowedDepts = getMatchingDeptIdentifiers(userDept);
                 for (Student student : students) {
-                    if (!allowedCourses.contains(student.getCourseId())) {
+                    if (!allowedDepts.contains(student.getDepartmentId())) {
                         throw new AccessDeniedException(
-                                "Forbidden: Staff can only mark attendance for students in their assigned course (" + staffCourse + ")");
+                                "Forbidden: " + currentUser.getRole() + " can only mark attendance for students in their own department (" + userDept + ")");
                     }
                 }
             }
@@ -259,37 +248,23 @@ public class AttendanceService {
                 if (studentId == null) {
                     return new PageResponse<>(List.of(), page, size, 0L, 0);
                 }
-            } else if (currentUser.getRole() == Role.HOD) {
-                // HOD can only see attendance of students in their own department
-                if (studentId != null) {
-                    Student student = studentRepository.findById(studentId).orElse(null);
-                    if (student == null || !student.getDepartmentId().equals(currentUser.getDepartmentId())) {
-                        throw new AccessDeniedException("Forbidden: HOD can only view attendance for own department");
-                    }
-                } else {
-                    List<String> deptStudentIds = studentRepository.findByDepartmentIdAndActiveTrue(currentUser.getDepartmentId())
-                            .stream().map(Student::getId).toList();
-                    if (effectiveStudentIds == null) {
-                        effectiveStudentIds = new ArrayList<>(deptStudentIds);
-                    } else {
-                        effectiveStudentIds.retainAll(deptStudentIds);
-                    }
-                }
-            } else if (currentUser.getRole() == Role.STAFF) {
-                if (currentUser.getCourseId() != null && !currentUser.getCourseId().isBlank()) {
-                    List<String> allowedCourses = getMatchingCourseIdentifiers(currentUser.getCourseId());
+            } else if (currentUser.getRole() == Role.HOD || currentUser.getRole() == Role.STAFF) {
+                // HOD & STAFF: Full attendance access to their own department
+                String deptId = currentUser.getDepartmentId();
+                if (deptId != null && !deptId.isBlank()) {
+                    List<String> allowedDepts = getMatchingDeptIdentifiers(deptId);
                     if (studentId != null && !studentId.isBlank()) {
                         Student student = studentRepository.findById(studentId.trim()).orElse(null);
-                        if (student == null || student.getCourseId() == null || !allowedCourses.contains(student.getCourseId())) {
-                            throw new AccessDeniedException("Forbidden: Staff can only view attendance for students in their assigned course (" + currentUser.getCourseId() + ")");
+                        if (student == null || !allowedDepts.contains(student.getDepartmentId())) {
+                            throw new AccessDeniedException("Forbidden: " + currentUser.getRole() + " can only view attendance for own department");
                         }
                     } else {
-                        List<String> courseStudentIds = studentRepository.findByCourseIdInAndActiveTrue(allowedCourses).stream()
-                                .map(Student::getId).toList();
+                        List<String> deptStudentIds = studentRepository.findByDepartmentIdInAndActiveTrue(allowedDepts)
+                                .stream().map(Student::getId).toList();
                         if (effectiveStudentIds == null) {
-                            effectiveStudentIds = new ArrayList<>(courseStudentIds);
+                            effectiveStudentIds = new ArrayList<>(deptStudentIds);
                         } else {
-                            effectiveStudentIds.retainAll(courseStudentIds);
+                            effectiveStudentIds.retainAll(deptStudentIds);
                         }
                     }
                 }
@@ -350,11 +325,11 @@ public class AttendanceService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + studentId));
         AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
-        if (currentUser != null && currentUser.getRole() == Role.STAFF) {
-            if (currentUser.getCourseId() != null && !currentUser.getCourseId().isBlank()) {
-                List<String> allowedCourses = getMatchingCourseIdentifiers(currentUser.getCourseId());
-                if (student.getCourseId() == null || !allowedCourses.contains(student.getCourseId())) {
-                    throw new AccessDeniedException("Forbidden: Staff can only access attendance of students in their assigned course (" + currentUser.getCourseId() + ")");
+        if (currentUser != null && (currentUser.getRole() == Role.STAFF || currentUser.getRole() == Role.HOD)) {
+            if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
+                List<String> allowedDepts = getMatchingDeptIdentifiers(currentUser.getDepartmentId());
+                if (!allowedDepts.contains(student.getDepartmentId())) {
+                    throw new AccessDeniedException("Forbidden: " + currentUser.getRole() + " can only access attendance of students in their own department (" + currentUser.getDepartmentId() + ")");
                 }
             }
         }
@@ -385,6 +360,16 @@ public class AttendanceService {
     public AttendanceSummaryResponse getStudentAttendanceSummary(String studentId) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + studentId));
+
+        AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser != null && (currentUser.getRole() == Role.STAFF || currentUser.getRole() == Role.HOD)) {
+            if (currentUser.getDepartmentId() != null && !currentUser.getDepartmentId().isBlank()) {
+                List<String> allowedDepts = getMatchingDeptIdentifiers(currentUser.getDepartmentId());
+                if (!allowedDepts.contains(student.getDepartmentId())) {
+                    throw new AccessDeniedException("Forbidden: " + currentUser.getRole() + " can only access attendance of students in their own department (" + currentUser.getDepartmentId() + ")");
+                }
+            }
+        }
 
         SecurityUtils.enforceStudentAttendanceReadAccess(student.getId(), student.getDepartmentId());
 
@@ -428,11 +413,23 @@ public class AttendanceService {
     }
 
     public List<String> getMatchingDeptIdentifiers(String deptIdentifier) {
-        return metadataCacheService.getMatchingDeptIdentifiers(deptIdentifier);
+        if (metadataCacheService != null) {
+            List<String> matches = metadataCacheService.getMatchingDeptIdentifiers(deptIdentifier);
+            if (matches != null && !matches.isEmpty()) {
+                return matches;
+            }
+        }
+        return (deptIdentifier != null && !deptIdentifier.isBlank()) ? List.of(deptIdentifier.trim()) : List.of();
     }
 
     public List<String> getMatchingCourseIdentifiers(String courseIdentifier) {
-        return metadataCacheService.getMatchingCourseIdentifiers(courseIdentifier);
+        if (metadataCacheService != null) {
+            List<String> matches = metadataCacheService.getMatchingCourseIdentifiers(courseIdentifier);
+            if (matches != null && !matches.isEmpty()) {
+                return matches;
+            }
+        }
+        return (courseIdentifier != null && !courseIdentifier.isBlank()) ? List.of(courseIdentifier.trim()) : List.of();
     }
 
     @Transactional

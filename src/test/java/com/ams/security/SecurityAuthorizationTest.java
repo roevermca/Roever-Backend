@@ -208,4 +208,43 @@ class SecurityAuthorizationTest {
             assertThat(response.getId()).isEqualTo("std-101");
         });
     }
+
+    @Test
+    @DisplayName("STAFF has full access to all students across courses within their assigned department")
+    void staffAccessingDepartmentStudents_allowedAcrossMultipleCourses() {
+        setSecurityContext("staff-ca", Role.STAFF, "dept-ca", null);
+
+        Student bcaStudent = new Student("2024BCA01", "BCA Student", "bca@ams.edu", "1234567890",
+                "dept-ca", "course-bca", ProgramType.UG, 1, "A", true);
+        bcaStudent.setId("std-bca-01");
+
+        Student mcaStudent = new Student("2024MCA01", "MCA Student", "mca@ams.edu", "1234567890",
+                "dept-ca", "course-mca", ProgramType.PG, 1, "A", true);
+        mcaStudent.setId("std-mca-01");
+
+        given(studentRepository.findById("std-bca-01")).willReturn(Optional.of(bcaStudent));
+        given(studentRepository.findById("std-mca-01")).willReturn(Optional.of(mcaStudent));
+
+        assertDoesNotThrow(() -> {
+            var bcaRes = studentService.getStudentById("std-bca-01");
+            assertThat(bcaRes.getId()).isEqualTo("std-bca-01");
+
+            var mcaRes = studentService.getStudentById("std-mca-01");
+            assertThat(mcaRes.getId()).isEqualTo("std-mca-01");
+        });
+    }
+
+    @Test
+    @DisplayName("STAFF attempting to access student from another department is blocked")
+    void staffAccessingOtherDepartmentStudent_blocked() {
+        setSecurityContext("staff-ca", Role.STAFF, "dept-ca", null);
+
+        Student eeStudent = new Student("2024EE01", "EE Student", "ee@ams.edu", "1234567890",
+                "dept-ee", "course-ee", ProgramType.UG, 1, "A", true);
+        eeStudent.setId("std-ee-01");
+
+        given(studentRepository.findById("std-ee-01")).willReturn(Optional.of(eeStudent));
+
+        assertThrows(AccessDeniedException.class, () -> studentService.getStudentById("std-ee-01"));
+    }
 }
