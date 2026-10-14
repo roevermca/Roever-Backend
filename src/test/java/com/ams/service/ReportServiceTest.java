@@ -33,6 +33,7 @@ import com.ams.model.Role;
 import com.ams.model.Student;
 import com.ams.repository.AttendanceRepository;
 import com.ams.repository.CourseRepository;
+import com.ams.repository.DailyAttendanceSummaryRepository;
 import com.ams.repository.DepartmentRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.security.AuthenticatedUser;
@@ -62,6 +63,9 @@ class ReportServiceTest {
 
     @Mock
     private MetadataCacheService metadataCacheService;
+
+    @Mock
+    private DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository;
 
     @InjectMocks
     private ReportService reportService;

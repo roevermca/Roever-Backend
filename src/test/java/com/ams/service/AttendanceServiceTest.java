@@ -35,6 +35,7 @@ import com.ams.model.Student;
 import com.ams.repository.AttendanceArchiveRepository;
 import com.ams.repository.AttendanceRepository;
 import com.ams.repository.CourseRepository;
+import com.ams.repository.DailyAttendanceSummaryRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.security.AuthenticatedUser;
 
@@ -61,6 +62,12 @@ class AttendanceServiceTest {
 
     @Mock
     private AttendanceArchiveRepository archiveRepository;
+
+    @Mock
+    private MetadataCacheService metadataCacheService;
+
+    @Mock
+    private DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository;
 
     @InjectMocks
     private AttendanceService attendanceService;

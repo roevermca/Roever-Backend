@@ -19,7 +19,10 @@ public interface DailyAttendanceSummaryRepository extends JpaRepository<DailyAtt
 
     @Query(value = "SELECT " +
             "d.department_id AS departmentId, " +
-            "COALESCE(SUM(d.total_students), 0) AS totalStudents, " +
+            "(SELECT COUNT(*) FROM students s WHERE s.active = true AND s.department_id = d.department_id " +
+            "  AND (:filterCourse = false OR s.course_id IN (:courseIds)) " +
+            "  AND (:year IS NULL OR s.year = :year) " +
+            "  AND (:section IS NULL OR s.section = :section)) AS totalStudents, " +
             "COALESCE(SUM(d.present_count), 0) AS presentCount, " +
             "COALESCE(SUM(d.absent_count), 0) AS absentCount, " +
             "COALESCE(SUM(d.present_count + d.absent_count), 0) AS totalCount " +
@@ -43,7 +46,11 @@ public interface DailyAttendanceSummaryRepository extends JpaRepository<DailyAtt
     );
 
     @Query(value = "SELECT " +
-            "COALESCE(SUM(d.total_students), 0) AS totalStudents, " +
+            "(SELECT COUNT(*) FROM students s WHERE s.active = true " +
+            "  AND (:filterDept = false OR s.department_id IN (:deptIds)) " +
+            "  AND (:filterCourse = false OR s.course_id IN (:courseIds)) " +
+            "  AND (:year IS NULL OR s.year = :year) " +
+            "  AND (:section IS NULL OR s.section = :section)) AS totalStudents, " +
             "COALESCE(SUM(d.present_count + d.absent_count), 0) AS totalRecords, " +
             "COALESCE(SUM(d.present_count), 0) AS presentRecords, " +
             "COALESCE(SUM(d.absent_count), 0) AS absentRecords " +

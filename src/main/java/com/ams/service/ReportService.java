@@ -33,6 +33,7 @@ import com.ams.model.Role;
 import com.ams.model.Student;
 import com.ams.repository.AttendanceRepository;
 import com.ams.repository.CourseRepository;
+import com.ams.repository.DailyAttendanceSummaryRepository;
 import com.ams.repository.DepartmentRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.security.AuthenticatedUser;
@@ -48,18 +49,21 @@ public class ReportService {
     private final DepartmentRepository departmentRepository;
     private final CourseRepository courseRepository;
     private final MetadataCacheService metadataCacheService;
+    private final DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository;
 
     public ReportService(
             StudentRepository studentRepository,
             AttendanceRepository attendanceRepository,
             DepartmentRepository departmentRepository,
             CourseRepository courseRepository,
-            MetadataCacheService metadataCacheService) {
+            MetadataCacheService metadataCacheService,
+            DailyAttendanceSummaryRepository dailyAttendanceSummaryRepository) {
         this.studentRepository = studentRepository;
         this.attendanceRepository = attendanceRepository;
         this.departmentRepository = departmentRepository;
         this.courseRepository = courseRepository;
         this.metadataCacheService = metadataCacheService;
+        this.dailyAttendanceSummaryRepository = dailyAttendanceSummaryRepository;
     }
 
     private String resolveDepartmentId(String departmentId) {
@@ -151,17 +155,36 @@ public class ReportService {
         boolean filterCourse = !courseList.isEmpty();
         String programTypeStr = programType != null ? programType.name() : null;
 
-        OverallAttendanceSummary summary = attendanceRepository.getOverallAttendanceSummary(
-                startDate,
-                endDate,
-                filterDept,
-                filterDept ? deptList : List.of(""),
-                filterCourse,
-                filterCourse ? courseList : List.of(""),
-                programTypeStr,
-                year,
-                section
-        );
+        OverallAttendanceSummary summary = null;
+        if (programTypeStr == null && dailyAttendanceSummaryRepository != null) {
+            try {
+                summary = dailyAttendanceSummaryRepository.getRollupOverallSummary(
+                        startDate,
+                        endDate,
+                        filterDept,
+                        filterDept ? deptList : List.of(""),
+                        filterCourse,
+                        filterCourse ? courseList : List.of(""),
+                        year,
+                        section
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (summary == null || summary.getTotalRecords() == null || summary.getTotalRecords() == 0) {
+            summary = attendanceRepository.getOverallAttendanceSummary(
+                    startDate,
+                    endDate,
+                    filterDept,
+                    filterDept ? deptList : List.of(""),
+                    filterCourse,
+                    filterCourse ? courseList : List.of(""),
+                    programTypeStr,
+                    year,
+                    section
+            );
+        }
 
         long totalStudents = summary != null && summary.getTotalStudents() != null ? summary.getTotalStudents() : 0;
         long totalRecords = summary != null && summary.getTotalRecords() != null ? summary.getTotalRecords() : 0;
@@ -265,17 +288,36 @@ public class ReportService {
         boolean filterCourse = !courseList.isEmpty();
         String programTypeStr = programType != null ? programType.name() : null;
 
-        List<DepartmentAttendanceSummary> summaries = attendanceRepository.getDepartmentAttendanceSummary(
-                startDate,
-                endDate,
-                filterDept,
-                filterDept ? deptList : List.of(""),
-                filterCourse,
-                filterCourse ? courseList : List.of(""),
-                programTypeStr,
-                year,
-                section
-        );
+        List<DepartmentAttendanceSummary> summaries = null;
+        if (programTypeStr == null && dailyAttendanceSummaryRepository != null) {
+            try {
+                summaries = dailyAttendanceSummaryRepository.getRollupDepartmentSummary(
+                        startDate,
+                        endDate,
+                        filterDept,
+                        filterDept ? deptList : List.of(""),
+                        filterCourse,
+                        filterCourse ? courseList : List.of(""),
+                        year,
+                        section
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (summaries == null || summaries.isEmpty()) {
+            summaries = attendanceRepository.getDepartmentAttendanceSummary(
+                    startDate,
+                    endDate,
+                    filterDept,
+                    filterDept ? deptList : List.of(""),
+                    filterCourse,
+                    filterCourse ? courseList : List.of(""),
+                    programTypeStr,
+                    year,
+                    section
+            );
+        }
 
         Map<String, DepartmentAttendanceSummary> summaryByDept = summaries.stream()
                 .filter(s -> s.getDepartmentId() != null)
