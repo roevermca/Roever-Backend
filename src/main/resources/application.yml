@@ -1,0 +1,60 @@
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 512
+
+spring:
+  application:
+    name: attendance-management-system
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:ams_db}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: AmsHikariPool
+      maximum-pool-size: ${DB_POOL_MAX:25}
+      minimum-idle: ${DB_POOL_MIN:5}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 20000
+      leak-detection-threshold: 30000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        auto_quote_keyword: true
+        format_sql: false
+        jdbc:
+          batch_size: 50
+          order_inserts: true
+          order_updates: true
+          batch_versioned_data: true
+        generate_statistics: false
+
+firebase:
+  credentials:
+    path: ${FIREBASE_CREDENTIALS_PATH:}
+    json: ${FIREBASE_CREDENTIALS_JSON:}
+  project-id: ${FIREBASE_PROJECT_ID:roever-ams}
+
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:3000,https://roevermca.netlify.app,https://*.netlify.app,https://*.vercel.app,*}
+
+logging:
+  level:
+    root: INFO
+    com.ams: INFO
+    org.hibernate: INFO
+
+ams:
+  storage:
+    max-quota-bytes: ${STORAGE_MAX_QUOTA_BYTES:1073741824} # 1 GB MySQL Database Storage Quota
+    cleanup-threshold-percent: ${STORAGE_CLEANUP_THRESHOLD:80.0} # 80% trigger
+    target-threshold-percent: ${STORAGE_TARGET_THRESHOLD:70.0} # 70% safe target
+    retention-min-days: ${STORAGE_RETENTION_MIN_DAYS:90} # Current semester protection (90 days)
